@@ -1,0 +1,21 @@
+//pair
+adb pair "192.168.1.41:PORT_AFFICHE" CODE_AFFICHE
+
+//connect
+adb connect 192.168.1.141:<PORT_PRINCIPAL>
+
+//check
+adb devices
+
+//low connect input
+cd android
+./gradlew assembleDebug --info
+
+//motors
+ flutter precache --android --universal
+
+ //in case build fails
+ unset ADB_TRACE
+
+
+wireless connect
