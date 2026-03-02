@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart';
+import 'models/student.dart';
+import 'pages/file_browser_page.dart';
+import 'pages/results_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -8,84 +10,161 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Excel Calculator',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Excel Calculator'),
+      home: const HomePage(),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/results') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => ResultsPage(
+              students: args['students'] as List<Student>,
+              subjectColumns: args['subjectColumns'] as List<String>,
+            ),
+          );
+        }
+        return null;
+      },
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
- 
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and then invoke "hot reload" to see the
-        // AppBar change color while the app is running.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+        title: const Text('Excel Calculator'),
       ),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () {
-            final Workbook workbook = Workbook();
-            final Worksheet sheet = workbook.worksheets[0];
-            sheet.getRangeByName('A1').setNumber(10);
-            sheet.getRangeByName('A2').setNumber(20);
-            sheet.getRangeByName('A3').setFormula('=SUM(A1:A2)');
-            final String result = sheet.getRangeByName('A3').value?.toString() ?? '0';
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                content: Text('The result of A1 + A2 is: $result'),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Browse Button
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FileBrowserPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.folder_open),
+              label: const Text('Browse for Excel File'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-            );
-          },
-          child: const Text('Calculate A1 + A2'),
+            ),
+            const SizedBox(height: 16),
+            
+            // Instructions Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'How to use:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                      const Text('1. Create an Excel file with student data'),
+                    const SizedBox(height: 4),
+                    const Text('2. Format your table like this:'),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Row 1 (A1): Exam', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('Row 2: Name | Math | Physics | Chemistry', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('Row 3: John | 85   | 78      | 92'),
+                          Text('Row 4: Jane | 65   | 70      | 68'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('3. The app will calculate GPA for each student'),
+                    const SizedBox(height: 4),
+                    const Text('4. Save the results as a new Excel file'),
+                  ],
+                ),
+              ),
+            ),
+            
+            const Spacer(),
+            
+            // GPA Scale Info
+            Card(
+              color: Colors.blue.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'GPA Scale:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildGPAScaleRow('A', '80-100', Colors.green),
+                    _buildGPAScaleRow('B', '70-80', Colors.blue),
+                    _buildGPAScaleRow('C+', '60-70', Colors.teal),
+                    _buildGPAScaleRow('C', '50-60', Colors.orange),
+                    _buildGPAScaleRow('D', '35-50', Colors.deepOrange),
+                    _buildGPAScaleRow('F', '0-35', Colors.red),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-     );
+    );
+  }
+
+  Widget _buildGPAScaleRow(String grade, String range, MaterialColor color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.shade700,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              grade,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(range),
+        ],
+      ),
+    );
   }
 }
