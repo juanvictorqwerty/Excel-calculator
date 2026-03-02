@@ -34,40 +34,24 @@ class ResultsPage extends StatelessWidget {
       final sheet = workbook.worksheets[0];
       sheet.name = 'GPA Results';
 
-      // Headers
-      sheet.getRangeByIndex(1, 1).setText('Student Name');
-      sheet.getRangeByIndex(1, 2).setText('Average');
-      sheet.getRangeByIndex(1, 3).setText('GPA');
-      
-      // Add subject columns
-      for (int i = 0; i < subjectColumns.length; i++) {
-        sheet.getRangeByIndex(1, 4 + i).setText(subjectColumns[i]);
-      }
+      // Headers - Name and GPA
+      sheet.getRangeByIndex(1, 1).setText('Name');
+      sheet.getRangeByIndex(1, 2).setText('GPA');
 
       // Style header row
-      for (int i = 1; i <= 3 + subjectColumns.length; i++) {
+      for (int i = 1; i <= 2; i++) {
         final cell = sheet.getRangeByIndex(1, i);
         cell.cellStyle.bold = true;
         cell.cellStyle.backColor = '#CCCCCC';
       }
 
-      // Data rows
+      // Data rows - Name and GPA
       for (int i = 0; i < students.length; i++) {
         final student = students[i];
         final rowIndex = i + 2;
         
         sheet.getRangeByIndex(rowIndex, 1).setText(student.name);
-        sheet.getRangeByIndex(rowIndex, 2).setNumber(student.average);
-        sheet.getRangeByIndex(rowIndex, 3).setText(student.gpa);
-        
-        // Add subject grades
-        for (int j = 0; j < subjectColumns.length; j++) {
-          final subject = subjectColumns[j];
-          final grade = student.subjects[subject];
-          if (grade != null) {
-            sheet.getRangeByIndex(rowIndex, 4 + j).setNumber(grade);
-          }
-        }
+        sheet.getRangeByIndex(rowIndex, 2).setText(student.gpa);
       }
 
       // Save file
@@ -92,12 +76,25 @@ class ResultsPage extends StatelessWidget {
       }
 
       if (outputFile != null) {
-        final file = File(outputFile);
+        // Check if file exists and generate unique name
+        String finalPath = outputFile;
+        final baseFile = File(outputFile);
+        
+        if (await baseFile.exists()) {
+          // Generate unique filename with timestamp
+          final now = DateTime.now();
+          final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+          final dir = baseFile.parent.path;
+          final name = 'GPA_Results_$timestamp.xlsx';
+          finalPath = '$dir/$name';
+        }
+        
+        final file = File(finalPath);
         await file.writeAsBytes(bytes);
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Saved to: $outputFile')),
+            SnackBar(content: Text('Saved to: $finalPath')),
           );
         }
       } else if (context.mounted) {
