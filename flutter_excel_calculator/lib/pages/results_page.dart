@@ -61,8 +61,8 @@ class ResultsPage extends StatelessWidget {
       // Get save location
       String? outputFile;
       if (Platform.isAndroid) {
-        // Save to Downloads folder on Android
-        outputFile = '/storage/emulated/0/Download/GPA_Results.xlsx';
+        // Save to Documents folder on Android
+        outputFile = '/storage/emulated/0/Documents/GPA_Results.xlsx';
       } else if (Platform.isIOS) {
         final directory = await getApplicationDocumentsDirectory();
         outputFile = '${directory.path}/GPA_Results.xlsx';
