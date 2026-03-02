@@ -5,7 +5,7 @@ import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 import 'package:path_provider/path_provider.dart';
 import '../models/student.dart';
 
-class ResultsPage extends StatelessWidget {
+class ResultsPage extends StatefulWidget {
   final List<Student> students;
   final List<String> subjectColumns;
 
@@ -14,6 +14,12 @@ class ResultsPage extends StatelessWidget {
     required this.students,
     required this.subjectColumns,
   });
+
+  @override
+  State<ResultsPage> createState() => _ResultsPageState();
+}
+
+class _ResultsPageState extends State<ResultsPage> {
 
   Color _getGPAColor(String gpa) {
     switch (gpa) {
@@ -46,8 +52,8 @@ class ResultsPage extends StatelessWidget {
       }
 
       // Data rows - Name and GPA
-      for (int i = 0; i < students.length; i++) {
-        final student = students[i];
+      for (int i = 0; i < widget.students.length; i++) {
+        final student = widget.students[i];
         final rowIndex = i + 2;
         
         sheet.getRangeByIndex(rowIndex, 1).setText(student.name);
@@ -123,7 +129,7 @@ class ResultsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final classAverage = students.map((s) => s.average).reduce((a, b) => a + b) / students.length;
+    final classAverage = widget.students.map((s) => s.average).reduce((a, b) => a + b) / widget.students.length;
     
     return Scaffold(
       appBar: AppBar(
@@ -147,38 +153,47 @@ class ResultsPage extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStat('Total Students', students.length.toString()),
+                  _buildStat('Total Students', widget.students.length.toString()),
                   _buildStat('Class Average', classAverage.toStringAsFixed(2)),
                 ],
               ),
             ),
           ),
           
-          // GPA Legend
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 8,
+          // Collapsible GPA Legend
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ExpansionTile(
+              title: const Text('GPA Scale'),
+              leading: const Icon(Icons.info_outline),
               children: [
-                _buildLegend('A (80-100)', Colors.green.shade700),
-                _buildLegend('B (70-80)', Colors.blue.shade700),
-                _buildLegend('C+ (60-70)', Colors.teal.shade700),
-                _buildLegend('C (50-60)', Colors.orange.shade700),
-                _buildLegend('D (35-50)', Colors.deepOrange.shade700),
-                _buildLegend('F (0-35)', Colors.red.shade700),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildLegend('A (80-100)', Colors.green.shade700),
+                      _buildLegend('B (70-80)', Colors.blue.shade700),
+                      _buildLegend('C+ (60-70)', Colors.teal.shade700),
+                      _buildLegend('C (50-60)', Colors.orange.shade700),
+                      _buildLegend('D (35-50)', Colors.deepOrange.shade700),
+                      _buildLegend('F (0-35)', Colors.red.shade700),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
           
-          const SizedBox(height: 8),
           const Divider(),
           
           // Students List
           Expanded(
             child: ListView.builder(
-              itemCount: students.length,
+              itemCount: widget.students.length,
               itemBuilder: (context, index) {
-                final student = students[index];
+                final student = widget.students[index];
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: ExpansionTile(
