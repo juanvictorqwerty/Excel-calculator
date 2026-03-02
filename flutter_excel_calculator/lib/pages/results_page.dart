@@ -145,40 +145,53 @@ class _ResultsPageState extends State<ResultsPage> {
       ),
       body: Column(
         children: [
-          // Summary Card
+          // Collapsible Top Section (Summary + GPA Scale)
           Card(
             margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: ExpansionTile(
+              title: Row(
                 children: [
-                  _buildStat('Total Students', widget.students.length.toString()),
-                  _buildStat('Class Average', classAverage.toStringAsFixed(2)),
+                  const Icon(Icons.analytics),
+                  const SizedBox(width: 8),
+                  Text('Summary (${widget.students.length} students)'),
                 ],
               ),
-            ),
-          ),
-          
-          // Collapsible GPA Legend
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ExpansionTile(
-              title: const Text('GPA Scale'),
-              leading: const Icon(Icons.info_outline),
               children: [
+                // Summary Stats
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildLegend('A (80-100)', Colors.green.shade700),
-                      _buildLegend('B (70-80)', Colors.blue.shade700),
-                      _buildLegend('C+ (60-70)', Colors.teal.shade700),
-                      _buildLegend('C (50-60)', Colors.orange.shade700),
-                      _buildLegend('D (35-50)', Colors.deepOrange.shade700),
-                      _buildLegend('F (0-35)', Colors.red.shade700),
+                      _buildStat('Total Students', widget.students.length.toString()),
+                      _buildStat('Class Average', classAverage.toStringAsFixed(2)),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // GPA Scale
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'GPA Scale:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildLegend('A (80-100)', Colors.green.shade700),
+                          _buildLegend('B (70-80)', Colors.blue.shade700),
+                          _buildLegend('C+ (60-70)', Colors.teal.shade700),
+                          _buildLegend('C (50-60)', Colors.orange.shade700),
+                          _buildLegend('D (35-50)', Colors.deepOrange.shade700),
+                          _buildLegend('F (0-35)', Colors.red.shade700),
+                        ],
+                      ),
                     ],
                   ),
                 ),
