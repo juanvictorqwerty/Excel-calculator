@@ -1,9 +1,29 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path/path.dart' as path;
 import '../models/student.dart';
+import '../services/excel_export_service.dart';
+import '../services/pdf_export_service.dart';
+import '../services/xml_export_service.dart';
+import '../services/docx_export_service.dart';
+
+/// Enum representing export formats
+enum ExportFormat {
+  excel('Excel', 'xlsx', Icons.table_chart, Colors.green),
+  pdf('PDF', 'pdf', Icons.picture_as_pdf, Colors.red),
+  word('Word', 'doc', Icons.description, Colors.blue),
+  xml('XML', 'xml', Icons.code, Colors.orange);
+
+  final String label;
+  final String extension;
+  final IconData icon;
+  final Color color;
+
+  const ExportFormat(this.label, this.extension, this.icon, this.color);
+}
 
 class ResultsPage extends StatefulWidget {
   final List<Student> students;
@@ -20,126 +40,256 @@ class ResultsPage extends StatefulWidget {
 }
 
 class _ResultsPageState extends State<ResultsPage> {
+  bool _isExporting = false;
 
   Color _getGPAColor(String gpa) {
     switch (gpa) {
-      case 'A': return Colors.green.shade700;
-      case 'B': return Colors.blue.shade700;
-      case 'C+': return Colors.teal.shade700;
-      case 'C': return Colors.orange.shade700;
-      case 'D': return Colors.deepOrange.shade700;
-      case 'F': return Colors.red.shade700;
-      default: return Colors.grey;
+      case 'A':
+        return Colors.green.shade700;
+      case 'B':
+        return Colors.blue.shade700;
+      case 'C+':
+        return Colors.teal.shade700;
+      case 'C':
+        return Colors.orange.shade700;
+      case 'D':
+        return Colors.deepOrange.shade700;
+      case 'F':
+        return Colors.red.shade700;
+      default:
+        return Colors.grey;
     }
   }
 
-  /// Save results as a new Excel file
-  Future<void> _saveResultsAsExcel(BuildContext context) async {
+  /// Show format selection bottom sheet
+  Future<void> _showExportOptions(BuildContext context) async {
+    final result = await showModalBottomSheet<ExportFormat>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _ExportFormatSheet(
+        onFormatSelected: (format) => Navigator.pop(context, format),
+      ),
+    );
+
+    if (result != null && context.mounted) {
+      await _exportResults(context, result);
+    }
+  }
+
+  /// Export results in the selected format
+  Future<void> _exportResults(BuildContext context, ExportFormat format) async {
+    setState(() => _isExporting = true);
+
     try {
-      final workbook = xlsio.Workbook();
-      final sheet = workbook.worksheets[0];
-      sheet.name = 'GPA Results';
+      final classAverage = widget.students.map((s) => s.average).reduce((a, b) => a + b) /
+          widget.students.length;
 
-      // Headers - Name and GPA
-      sheet.getRangeByIndex(1, 1).setText('Name');
-      sheet.getRangeByIndex(1, 2).setText('GPA');
-
-      // Style header row
-      for (int i = 1; i <= 2; i++) {
-        final cell = sheet.getRangeByIndex(1, i);
-        cell.cellStyle.bold = true;
-        cell.cellStyle.backColor = '#CCCCCC';
-      }
-
-      // Data rows - Name and GPA
-      for (int i = 0; i < widget.students.length; i++) {
-        final student = widget.students[i];
-        final rowIndex = i + 2;
-        
-        sheet.getRangeByIndex(rowIndex, 1).setText(student.name);
-        sheet.getRangeByIndex(rowIndex, 2).setText(student.gpa);
-      }
-
-      // Save file
-      final bytes = workbook.saveAsStream();
-      workbook.dispose();
+      // Generate file content based on format
+      final bytes = await _generateExportBytes(format, classAverage);
 
       // Get save location
-      String? outputFile;
-      if (Platform.isAndroid) {
-        // Save to Documents folder on Android
-        outputFile = '/storage/emulated/0/Documents/GPA_Results.xlsx';
-      } else if (Platform.isIOS) {
-        final directory = await getApplicationDocumentsDirectory();
-        outputFile = '${directory.path}/GPA_Results.xlsx';
-      } else {
-        outputFile = await FilePicker.platform.saveFile(
-          dialogTitle: 'Save GPA Results',
-          fileName: 'GPA_Results.xlsx',
-          allowedExtensions: ['xlsx'],
-          type: FileType.custom,
-        );
-      }
+      String? outputPath = await _getSavePath(format);
 
-      if (outputFile != null) {
-        // Check if file exists and generate unique name
-        String finalPath = outputFile;
-        final baseFile = File(outputFile);
-        
-        if (await baseFile.exists()) {
-          // Generate unique filename with timestamp
-          final now = DateTime.now();
-          final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-          final dir = baseFile.parent.path;
-          final name = 'GPA_Results_$timestamp.xlsx';
-          finalPath = '$dir/$name';
-        }
-        
-        final file = File(finalPath);
+      if (outputPath != null) {
+        // Ensure unique filename
+        outputPath = await _ensureUniqueFilename(outputPath);
+
+        // Write file
+        final file = File(outputPath);
         await file.writeAsBytes(bytes);
-        
+
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Saved to: $finalPath')),
-          );
+          // Show success dialog with options
+          await _showExportSuccessDialog(context, outputPath!, format);
         }
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Save cancelled')),
+          const SnackBar(content: Text('Export cancelled')),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text('Error saving file: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+        _showErrorDialog(context, 'Error exporting file: $e');
+      }
+    } finally {
+      setState(() => _isExporting = false);
+    }
+  }
+
+  /// Generate export bytes based on format
+  Future<List<int>> _generateExportBytes(ExportFormat format, double classAverage) async {
+    switch (format) {
+      case ExportFormat.excel:
+        return await ExcelExportService.generateExcel(
+          students: widget.students,
+          subjectColumns: widget.subjectColumns,
+          classAverage: classAverage,
         );
+      case ExportFormat.pdf:
+        return await PdfExportService.generatePdf(
+          students: widget.students,
+          subjectColumns: widget.subjectColumns,
+          classAverage: classAverage,
+        );
+      case ExportFormat.word:
+        return await DocxExportService.generateDocx(
+          students: widget.students,
+          subjectColumns: widget.subjectColumns,
+          classAverage: classAverage,
+        );
+      case ExportFormat.xml:
+        return await XmlExportService.generateXml(
+          students: widget.students,
+          subjectColumns: widget.subjectColumns,
+          classAverage: classAverage,
+        );
+    }
+  }
+
+  /// Get save path from user
+  Future<String?> _getSavePath(ExportFormat format) async {
+    final timestamp = _formatTimestamp(DateTime.now());
+    final defaultFileName = 'GPA_Results_$timestamp.${format.extension}';
+
+    if (Platform.isAndroid) {
+      return '/storage/emulated/0/Documents/$defaultFileName';
+    } else if (Platform.isIOS) {
+      final directory = await getApplicationDocumentsDirectory();
+      return '${directory.path}/$defaultFileName';
+    } else {
+      return await FilePicker.platform.saveFile(
+        dialogTitle: 'Save GPA Results as ${format.label}',
+        fileName: defaultFileName,
+        allowedExtensions: [format.extension],
+        type: FileType.custom,
+      );
+    }
+  }
+
+  /// Ensure filename is unique by adding timestamp if needed
+  Future<String> _ensureUniqueFilename(String outputPath) async {
+    final file = File(outputPath);
+    if (await file.exists()) {
+      final dir = file.parent.path;
+      final ext = path.extension(outputPath);
+      final nameWithoutExt = path.basenameWithoutExtension(outputPath);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      return '$dir/${nameWithoutExt}_$timestamp$ext';
+    }
+    return outputPath;
+  }
+
+  /// Show export success dialog with share option
+  Future<void> _showExportSuccessDialog(
+    BuildContext context,
+    String filePath,
+    ExportFormat format,
+  ) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(format.icon, color: format.color, size: 48),
+        title: Text('${format.label} Export Complete'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('File saved successfully:'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                filePath,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _shareFile(filePath);
+            },
+            icon: const Icon(Icons.share),
+            label: const Text('Share'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Share the exported file
+  Future<void> _shareFile(String filePath) async {
+    try {
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        subject: 'GPA Results',
+        text: 'Here are the GPA results exported from Excel Calculator App.',
+      );
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog(context, 'Error sharing file: $e');
       }
     }
   }
 
+  /// Show error dialog
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+        title: const Text('Export Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime date) {
+    return '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}_'
+        '${date.hour.toString().padLeft(2, '0')}${date.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final classAverage = widget.students.map((s) => s.average).reduce((a, b) => a + b) / widget.students.length;
-    
+    final classAverage =
+        widget.students.map((s) => s.average).reduce((a, b) => a + b) / widget.students.length;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('GPA Results'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
-            onPressed: () => _saveResultsAsExcel(context),
-            icon: const Icon(Icons.save),
-            tooltip: 'Save as Excel',
+            onPressed: _isExporting ? null : () => _showExportOptions(context),
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save),
+            tooltip: 'Export Results',
           ),
         ],
       ),
@@ -198,9 +348,9 @@ class _ResultsPageState extends State<ResultsPage> {
               ],
             ),
           ),
-          
+
           const Divider(),
-          
+
           // Students List
           Expanded(
             child: ListView.builder(
@@ -270,16 +420,23 @@ class _ResultsPageState extends State<ResultsPage> {
               },
             ),
           ),
-          
-          // Save Button
+
+          // Export Button
           Padding(
             padding: const EdgeInsets.all(16),
             child: ElevatedButton.icon(
-              onPressed: () => _saveResultsAsExcel(context),
-              icon: const Icon(Icons.save),
-              label: const Text('Save Results as Excel'),
+              onPressed: _isExporting ? null : () => _showExportOptions(context),
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download),
+              label: Text(_isExporting ? 'Exporting...' : 'Export Results'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                minimumSize: const Size(double.infinity, 56),
               ),
             ),
           ),
@@ -311,6 +468,90 @@ class _ResultsPageState extends State<ResultsPage> {
       ),
       label: Text(label, style: const TextStyle(fontSize: 10)),
       backgroundColor: Colors.grey.shade100,
+    );
+  }
+}
+
+/// Widget for displaying export format options
+class _ExportFormatSheet extends StatelessWidget {
+  final void Function(ExportFormat) onFormatSelected;
+
+  const _ExportFormatSheet({required this.onFormatSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
+            Text(
+              'Export Format',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Choose the format for your GPA results export',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+            ),
+            const SizedBox(height: 20),
+
+            // Format options
+            ...ExportFormat.values.map((format) => _buildFormatTile(context, format)),
+
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormatTile(BuildContext context, ExportFormat format) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        onTap: () => onFormatSelected(format),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: format.color.withAlpha(25),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(format.icon, color: format.color),
+        ),
+        title: Text(
+          format.label,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text('.${format.extension} file'),
+        trailing: const Icon(Icons.chevron_right),
+      ),
     );
   }
 }
