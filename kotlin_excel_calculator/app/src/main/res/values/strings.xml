@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Excel GPA Calculator</string>
+    <string name="browse_button">Browse for Excel File</string>
+    <string name="save_button">Save Results as Excel</string>
+    <string name="total_students">Total Students: %d</string>
+    <string name="class_average">Class Average: %.2f</string>
+    <string name="gpa_scale">GPA Scale:</string>
+    <string name="how_to_use">How to use:</string>
+    <string name="instructions">1. Create an Excel file with student data\n2. Format: Row 1 = Headers (Name, Subject1, Subject2...)\n3. Row 2+ = Student data\n4. The app will calculate GPA for each student</string>
+</resources>
