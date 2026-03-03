@@ -1,0 +1,16 @@
+name: excel_calculator
+description: A console application for calculating GPA from Excel files
+version: 1.0.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  excel: ^4.0.6
+  path: ^1.9.0
+
+dev_dependencies:
+  lints: ^4.0.0
+
+executables:
+  excel_calculator: excel_calculator

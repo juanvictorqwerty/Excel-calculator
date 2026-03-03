@@ -1,0 +1,16 @@
+cd kotlin_excel_calculator
+./gradlew clean                    # Clean build cache
+./gradlew assembleDebug            # Build debug APK
+./gradlew assembleRelease          # Build release APK
+
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.example.excelcalculator/.MainActivity
+
+adb logcat -s AndroidRuntime:E excelcalculator:D *:S
+adb logcat -d | grep -i "excelcalculator\|exception\|error" | tail -50
+
+adb devices                        # List connected devices
+adb -s <device_id> install -r app-debug.apk  # Install to specific device
+
+adb pair IP:PORT CODE
+adb connect IP:PORT
