@@ -1,0 +1,7 @@
+cd cli_dart
+
+# With command line argument
+dart run bin/excel_calculator.dart path/to/file.xlsx
+
+# Interactive mode (prompts for path)
+dart run bin/excel_calculator.dart
