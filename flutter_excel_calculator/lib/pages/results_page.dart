@@ -102,7 +102,7 @@ class _ResultsPageState extends State<ResultsPage> {
 
         if (context.mounted) {
           // Show success dialog with options
-          await _showExportSuccessDialog(context, outputPath!, format);
+          await _showExportSuccessDialog(context, outputPath, format);
         }
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
